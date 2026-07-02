@@ -1,0 +1,29 @@
+ID,Tache,Duree_jours,Predecesseurs,Ressource,Jalon,Avancement_pct,Cout_EUR_interne
+T1,Cadrage besoin et hypotheses,1,,CDP,,0,282
+T2,Redaction cahier technique (sections A-E),2,T1,CDP+DEVOPS,,0,1080
+T3,Revue et validation du cahier,1,T2,CDP,J1,0,282
+T4,Souscription serveur dedie,1,T3,CDP,,0,282
+T5,Configuration systeme Linux (durcissement reseau),2,T4,DEVOPS,,0,516
+T6,Reseau Docker (zones publique/outils/applicative/donnees),1,T5,DEVOPS,,0,258
+T7,Achat nom de domaine et configuration DNS,1,T4,CDP,,0,282
+T8,Deploiement Traefik (reverse proxy + Let's Encrypt),1,T6,DEVOPS,,0,258
+T9,Deploiement Gitea + base Postgres,1,T8,DEVOPS,,0,258
+T10,Deploiement Jenkins,1,T8,DEVOPS,,0,258
+T11,Deploiement Docker Registry authentifiee,1,T8,DEVOPS,,0,258
+T12,Configuration des comptes nominatifs et des acces,1,"T9,T10,T11",DEVOPS (RS),,0,258
+T13,Tests de connectivite inter-services,1,T12,DEV,,0,226
+T14,Ecriture du Jenkinsfile declaratif type,2,T13,DEV,,0,452
+T15,Pipeline dev automatise (build/test/deploy),1,T14,DEVOPS,,0,258
+T16,Pipeline preprod automatise (promotion + smoke test),1,T15,DEVOPS,,0,258
+T17,Pipeline prod avec validation manuelle (go/no-go),1,T16,DEVOPS,J2,0,258
+T18,Deploiement Prometheus + exporters,1,T13,DEVOPS,,0,258
+T19,Deploiement Grafana + dashboards,1,T18,DEVOPS,,0,258
+T20,Deploiement Uptime Kuma + sondes,1,T13,DEVOPS,,0,258
+T21,Script de sauvegarde Restic + planification,1,T13,DEVOPS,,0,258
+T22,Test de restauration en environnement isole,1,T21,DEVOPS,J3,0,258
+T23,Durcissement securite (secrets scan politique correctifs),1,T12,DEVOPS (RS),,0,258
+T24,Redaction des procedures BPMN et UML,1,"T17,T22",CDP,,0,282
+T25,Redaction fiche de poste et plan de formation,1,T3,CDP,J4,0,282
+T26,Consolidation finale du cahier (couts risques annexes),1,"T24,T25",CDP,,0,282
+T27,Preparation du support de soutenance,1,T26,CDP+DEVOPS,,0,540
+T28,Revue finale et dossier complet pret,1,T27,CDP,J5,0,282

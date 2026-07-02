@@ -1,0 +1,135 @@
+// Jenkinsfile type - Workflow de production Furious Ducks
+// Pipeline declaratif reutilisable pour un projet client (site vitrine, applicatif ou mobile hybride).
+// Ce fichier vit dans le depot Gitea de CHAQUE projet client : les developpeurs le modifient
+// sans jamais avoir besoin d'un acces direct au serveur Jenkins (exigence du sujet).
+
+pipeline {
+    agent any
+
+    options {
+        timeout(time: 20, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        REGISTRY        = "registry.${DOMAIN_WORKFLOW}"
+        IMAGE_NAME      = "${REGISTRY}/${PROJECT_NAME}"
+        IMAGE_TAG       = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
+        SEMVER_TAG      = "${env.TAG_NAME ?: ''}"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Lint & Tests unitaires') {
+            steps {
+                sh '''
+                    echo "Optimisation des assets (minification/compression)"
+                    ./ci/optimize-assets.sh || true
+
+                    echo "Lint + tests unitaires"
+                    ./ci/lint.sh
+                    ./ci/unit-tests.sh
+                '''
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'reports/junit/*.xml'
+                }
+            }
+        }
+
+        stage('Quality Gate') {
+            steps {
+                sh './ci/quality-gate.sh'
+            }
+        }
+
+        stage('Build image Docker') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+            }
+        }
+
+        stage('Push registry') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'registry-creds', usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
+                    sh '''
+                        echo "$REG_PASS" | docker login "$REGISTRY" -u "$REG_USER" --password-stdin
+                        docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy auto - dev') {
+            when { branch 'develop' }
+            steps {
+                sh "./ci/deploy.sh dev ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Smoke test - dev') {
+            when { branch 'develop' }
+            steps {
+                sh './ci/smoke-test.sh dev'
+            }
+        }
+
+        stage('Deploy auto - preprod') {
+            when { branch 'develop' }
+            steps {
+                sh "./ci/deploy.sh preprod ${IMAGE_NAME}:${IMAGE_TAG}"
+            }
+        }
+
+        stage('Smoke test - preprod') {
+            when { branch 'develop' }
+            steps {
+                sh './ci/smoke-test.sh preprod'
+            }
+        }
+
+        stage('Validation manuelle - prod') {
+            when { buildingTag() }
+            steps {
+                timeout(time: 24, unit: 'HOURS') {
+                    input message: "Autoriser le deploiement en PRODUCTION de la version ${SEMVER_TAG} ?",
+                          ok: 'Go'
+                }
+            }
+        }
+
+        stage('Deploy prod') {
+            when { buildingTag() }
+            steps {
+                sh "./ci/deploy.sh prod ${IMAGE_NAME}:${SEMVER_TAG}"
+            }
+        }
+
+        stage('Smoke test - prod') {
+            when { buildingTag() }
+            steps {
+                sh './ci/smoke-test.sh prod'
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "Pipeline en echec : voir logs ci-dessus. Rollback manuel possible via ./ci/rollback.sh <env>."
+        }
+        success {
+            echo "Pipeline vert - preuve a archiver pour la Definition of Done (capture + logs)."
+        }
+    }
+}
+
+// Rollback de reference (a executer manuellement ou via job Jenkins dedie) :
+//   ./ci/rollback.sh <env>
+// -> redeploie automatiquement la derniere image taggee stable connue pour l'environnement cible.

@@ -1,0 +1,185 @@
+version: "3.9"
+
+# Workflow de production Furious Ducks - Objectif n°1
+# Zones reseau :
+#   - zone_publique  : uniquement Traefik, expose sur Internet (443)
+#   - zone_outils    : Jenkins, Gitea, Registry, Prometheus, Grafana, Uptime Kuma
+#   - zone_applicative : reservee aux stacks des projets clients (dev/preprod/prod), non definie ici
+#   - zone_donnees   : volumes persistants, aucun acces reseau externe direct
+
+networks:
+  zone_publique:
+  zone_outils:
+    internal: false
+
+volumes:
+  traefik_letsencrypt:
+  jenkins_home:
+  gitea_data:
+  gitea_db:
+  registry_data:
+  prometheus_data:
+  grafana_data:
+  uptime_kuma_data:
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--api.dashboard=false"
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_letsencrypt:/letsencrypt"
+    networks:
+      - zone_publique
+      - zone_outils
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins
+    restart: unless-stopped
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+    volumes:
+      - "jenkins_home:/var/jenkins_home"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.jenkins.rule=Host(`jenkins.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.jenkins.entrypoints=websecure"
+      - "traefik.http.routers.jenkins.tls.certresolver=letsencrypt"
+      - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+
+  gitea:
+    image: gitea/gitea:1.22
+    container_name: gitea
+    restart: unless-stopped
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=postgres
+      - GITEA__database__HOST=gitea_db:5432
+      - GITEA__database__NAME=gitea
+      - GITEA__database__USER=gitea
+      - GITEA__database__PASSWD=${GITEA_DB_PASSWORD}
+      - GITEA__server__DOMAIN=git.${DOMAIN_WORKFLOW}
+      - GITEA__server__ROOT_URL=https://git.${DOMAIN_WORKFLOW}/
+    volumes:
+      - "gitea_data:/data"
+    depends_on:
+      - gitea_db
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.gitea.rule=Host(`git.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.gitea.entrypoints=websecure"
+      - "traefik.http.routers.gitea.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+
+  gitea_db:
+    image: postgres:16-alpine
+    container_name: gitea_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=gitea
+      - POSTGRES_PASSWORD=${GITEA_DB_PASSWORD}
+      - POSTGRES_DB=gitea
+    volumes:
+      - "gitea_db:/var/lib/postgresql/data"
+    networks:
+      - zone_outils
+
+  registry:
+    image: registry:2
+    container_name: registry
+    restart: unless-stopped
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=RegistryFuriousDucks
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+    volumes:
+      - "registry_data:/var/lib/registry"
+      - "./registry/auth:/auth:ro"
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.registry.rule=Host(`registry.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.registry.entrypoints=websecure"
+      - "traefik.http.routers.registry.tls.certresolver=letsencrypt"
+      - "traefik.http.services.registry.loadbalancer.server.port=5000"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - "./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "prometheus_data:/prometheus"
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - "grafana_data:/var/lib/grafana"
+    depends_on:
+      - prometheus
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.grafana.entrypoints=websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+
+  uptime_kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime_kuma
+    restart: unless-stopped
+    volumes:
+      - "uptime_kuma_data:/app/data"
+    networks:
+      - zone_outils
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=zone_outils"
+      - "traefik.http.routers.uptimekuma.rule=Host(`status.${DOMAIN_WORKFLOW}`)"
+      - "traefik.http.routers.uptimekuma.entrypoints=websecure"
+      - "traefik.http.routers.uptimekuma.tls.certresolver=letsencrypt"
+      - "traefik.http.services.uptimekuma.loadbalancer.server.port=3001"

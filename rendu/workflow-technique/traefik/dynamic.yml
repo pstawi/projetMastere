@@ -1,0 +1,27 @@
+# Configuration dynamique Traefik : middlewares de securite reutilisables sur les routers
+# (a referencer via le label "traefik.http.routers.<service>.middlewares=securite-headers@file,admin-auth@file")
+
+http:
+  middlewares:
+    securite-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        referrerPolicy: "same-origin"
+
+    # Protege les outils qui n'ont pas d'authentification native forte (ex: Prometheus).
+    # Le hash htpasswd doit etre genere localement : htpasswd -nb admin <mot_de_passe>
+    admin-auth:
+      basicAuth:
+        users:
+          - "admin:$$apr1$$REMPLACER$$PARLEHASHREEL"
+
+    limite-debit:
+      rateLimit:
+        average: 100
+        burst: 50

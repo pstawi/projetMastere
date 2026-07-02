@@ -1,0 +1,40 @@
+ID,Name,Begin date,End date,Duration,Completion,Cost,Predecessors,Resources,Notes
+1,Cadrage besoin et hypotheses,2026-03-02,2026-03-02,1,0,282,,CDP,
+2,Redaction cahier technique (sections A-E),2026-03-03,2026-03-04,2,0,1080,1,CDP;DEVOPS,
+3,Revue et validation du cahier,2026-03-05,2026-03-05,1,0,282,2,CDP,
+4,Souscription serveur dedie,2026-03-06,2026-03-06,1,0,282,3,CDP,
+5,Configuration systeme Linux,2026-03-09,2026-03-10,2,0,516,4,DEVOPS,
+6,Reseau Docker (zones),2026-03-11,2026-03-11,1,0,258,5,DEVOPS,
+7,Achat domaine et configuration DNS,2026-03-09,2026-03-09,1,0,282,4,CDP,
+8,Deploiement Traefik,2026-03-12,2026-03-12,1,0,258,6,DEVOPS,
+9,Deploiement Gitea + Postgres,2026-03-13,2026-03-13,1,0,258,8,DEVOPS,
+10,Deploiement Jenkins,2026-03-13,2026-03-13,1,0,258,8,DEVOPS,
+11,Deploiement Docker Registry,2026-03-13,2026-03-13,1,0,258,8,DEVOPS,
+12,Comptes nominatifs et acces,2026-03-16,2026-03-16,1,0,258,9;10;11,DEVOPS,
+13,Tests de connectivite inter-services,2026-03-17,2026-03-17,1,0,226,12,DEV,
+14,Ecriture du Jenkinsfile declaratif,2026-03-18,2026-03-19,2,0,452,13,DEV,
+15,Pipeline dev automatise,2026-03-20,2026-03-20,1,0,258,14,DEVOPS,
+16,Pipeline preprod automatise,2026-03-23,2026-03-23,1,0,258,15,DEVOPS,
+17,Pipeline prod + validation manuelle,2026-03-24,2026-03-24,1,0,258,16,DEVOPS,
+18,Deploiement Prometheus + exporters,2026-03-18,2026-03-18,1,0,258,13,DEVOPS,
+19,Deploiement Grafana + dashboards,2026-03-19,2026-03-19,1,0,258,18,DEVOPS,
+20,Deploiement Uptime Kuma,2026-03-18,2026-03-18,1,0,258,13,DEVOPS,
+21,Script de sauvegarde Restic,2026-03-18,2026-03-18,1,0,258,13,DEVOPS,
+22,Test de restauration isole,2026-03-19,2026-03-19,1,0,258,21,DEVOPS,
+23,Durcissement securite (secrets scans),2026-03-17,2026-03-17,1,0,258,12,DEVOPS,
+24,Redaction procedures BPMN-UML,2026-03-25,2026-03-25,1,0,282,17;22,CDP,
+25,Fiche de poste et plan de formation,2026-03-06,2026-03-06,1,0,282,3,CDP,
+26,Consolidation finale du cahier,2026-03-26,2026-03-26,1,0,282,24;25,CDP,
+27,Preparation support de soutenance,2026-03-27,2026-03-27,1,0,540,26,CDP;DEVOPS,
+28,Revue finale - dossier complet,2026-03-30,2026-03-30,1,0,282,27,CDP,
+101,J1 - Architecture cible validee,2026-03-05,2026-03-05,0,0,0,3,,
+102,J2 - Pipeline bout en bout demontrable,2026-03-24,2026-03-24,0,0,0,17,,
+103,J3 - Sauvegarde-restauration testees,2026-03-19,2026-03-19,0,0,0,22,,
+104,J4 - Documentation et fiche de poste finalisees,2026-03-25,2026-03-25,0,0,0,24;25,,
+105,J5 - Dossier complet pret,2026-03-30,2026-03-30,0,0,0,28,,
+
+
+ID,Name,Default role,Standard Rate
+1,CDP,Chef de projet,282
+2,DEVOPS,Ingenieur DevOps,258
+3,DEV,Developpeur,226
